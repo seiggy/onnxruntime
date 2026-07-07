@@ -1,0 +1,17 @@
+# Keep the buildx context small. The COPY . in the Dockerfile only needs the
+# ONNX Runtime source tree required to build the native library.
+.git
+.github
+build
+Build
+out
+**/out
+**/bin
+**/obj
+**/node_modules
+**/*.nupkg
+.venv
+**/.venv
+csharp/tools/jetson/out
+docs
+samples
