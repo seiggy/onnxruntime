@@ -152,6 +152,28 @@ dotnet run -c Release -r linux-arm64 -- path/model.onnx  # use your own float mo
 The `sample/nuget.config` adds `..\out` as a local feed so the locally built packages
 resolve. Set `-p:OrtVersion=` to match the version you packed.
 
+## Troubleshooting
+
+**Build fails ~75% with `gmake ... Error 2` during CUDA compile (e.g. after a
+`flash_fwd_*` / `flash_attention` object).** This is almost always **out-of-memory**,
+not a code error — the flash / memory-efficient / lean attention kernels are the heaviest
+`.cu` files and several parallel `nvcc` processes exhaust the 16 GB Orin. Confirm with:
+
+```bash
+dmesg | grep -iE "killed process|out of memory" | tail
+```
+
+Fix — rebuild with the fused-attention kernels disabled and lower parallelism (cached
+objects are reused, so it resumes near where it stopped):
+
+```bash
+csharp/tools/jetson/build_on_device.sh --low-memory      # = disable fused attention + --parallel 2
+```
+
+Attention ops then fall back to unfused CUDA kernels (fine for typical Jetson inference).
+To keep flash attention instead, add swap and drop to `--parallel 1`. You can also pass
+extra CMake defines via `EXTRA_CMAKE_DEFINES` to `build_ort_arm64.sh`.
+
 ## Important caveats
 
 * **Runtime deps come from JetPack.** The packaged `.so` files link against the device's

@@ -6,12 +6,13 @@
 # (the recommended, fastest-to-correct path).
 #
 # Usage (from anywhere in the repo checkout on the Orin):
-#   csharp/tools/jetson/build_on_device.sh [--tensorrt] [--parallel N] [--managed-version X]
+#   csharp/tools/jetson/build_on_device.sh [--tensorrt] [--parallel N] [--low-memory] [--managed-version X]
 #
 # Memory guidance for the 16 GB Orin Nano:
-#   The CUDA provider link step is memory-heavy. This script defaults parallelism
-#   to a conservative value. If you hit OOM, lower --parallel (e.g. 2) and ensure
-#   swap/zram is enabled:  sudo systemctl enable --now nvzramconfig  (JetPack)
+#   The flash/memory-efficient/lean attention CUDA kernels are the heaviest translation
+#   units and the usual cause of OOM ("gmake ... Error 2") during the CUDA compile.
+#   If you hit OOM, use --low-memory (disables those kernels + sets --parallel 2) and
+#   ensure swap/zram is enabled:  sudo systemctl enable --now nvzramconfig  (JetPack)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,6 +20,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 USE_TENSORRT=false
 PARALLEL="${PARALLEL:-4}"          # conservative default for 16 GB
+DISABLE_FUSED_ATTENTION="${DISABLE_FUSED_ATTENTION:-false}"
 MANAGED_VERSION=""
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/csharp/tools/jetson/out}"
 
@@ -26,6 +28,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --tensorrt)         USE_TENSORRT=true; shift ;;
     --parallel)         PARALLEL="$2"; shift 2 ;;
+    --low-memory)       DISABLE_FUSED_ATTENTION=true; PARALLEL=2; shift ;;
     --managed-version)  MANAGED_VERSION="$2"; shift 2 ;;
     --artifacts-dir)    ARTIFACTS_DIR="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
@@ -40,6 +43,7 @@ BUILD_CONFIG="${BUILD_CONFIG:-Release}" \
 CUDA_ARCH="${CUDA_ARCH:-87}" \
 USE_TENSORRT="$USE_TENSORRT" \
 PARALLEL="$PARALLEL" \
+DISABLE_FUSED_ATTENTION="$DISABLE_FUSED_ATTENTION" \
 ARTIFACTS_DIR="$ARTIFACTS_DIR" \
   "$SCRIPT_DIR/build_ort_arm64.sh"
 
